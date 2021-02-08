@@ -177,7 +177,8 @@ CREATE TABLE IF NOT EXISTS public.compose_pizzas
 (
 	cp_id serial NOT NULL UNIQUE PRIMARY KEY,
 	cp_name text,
-	cp_size integer
+	cp_size integer,
+	cp_price real
 );
 
 
