@@ -137,8 +137,9 @@ CREATE TABLE IF NOT EXISTS public.customers
 CREATE TABLE IF NOT EXISTS public.orders
 (
 	order_id bigserial NOT NULL UNIQUE PRIMARY KEY,
-	order_price real,
-	order_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+	order_price real NOT NULL,
+	order_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	compose_pizza integer NOT NULL REFERENCES compose_pizzas
 );
 CREATE TABLE IF NOT EXISTS public.base_pizzas
 (
@@ -261,6 +262,7 @@ CREATE OR REPLACE FUNCTION order_pizza(IN compose_pizza_id integer,OUT line inte
   i integer;
   restock integer= 0;
   get_cp_ing integer[]= (SELECT cp_ingredient FROM compose_pizzas WHERE cp_id = compose_pizza_id);
+  oprice real= (select cp_price from compose_pizzas where cp_id = compose_pizza_id);
  BEGIN
   FOREACH i IN ARRAY get_cp_ing
   LOOP
@@ -268,6 +270,32 @@ CREATE OR REPLACE FUNCTION order_pizza(IN compose_pizza_id integer,OUT line inte
 	restock = (SELECT stock FROM public.ingredients WHERE ingredient_id = i) - 1;
 	UPDATE public.ingredients SET stock = restock WHERE ingredient_id = i;
   END LOOP;
+  IF restock > 0 THEN
+   insert into orders(order_price,order_date,compose_pizza) values(oprice,now(),compose_pizza_id);
+  ELSE
+   RAISE NOTICE 'OUT OF STOCK';
+  END IF;
  END;
 $$;
 select order_pizza(6);
+
+CREATE OR REPLACE FUNCTION recently_ordered_pizzas()
+	RETURNS table(
+		od_id bigint,
+		cp_id integer,
+		od_pizza_name text,
+		od_date timestamp
+	)
+	LANGUAGE 'plpgsql'
+	AS $$
+ BEGIN
+  RETURN query 
+	  SELECT order_id,compose_pizza,cp_name,order_date 
+	  FROM orders 
+	  JOIN compose_pizzas 
+	  ON compose_pizzas.cp_id = orders.compose_pizza 
+	  ORDER BY order_date DESC LIMIT 2;
+ END;
+$$;
+
+select * from recently_ordered_pizzas();
